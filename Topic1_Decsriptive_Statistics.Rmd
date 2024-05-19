@@ -1,0 +1,771 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code.
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*.
+
+```{r}
+#Session Start Date:
+#Chapter 1 - Descriptive Statistics for Financial Data
+#Task 1: Descriptive Statistical Analysis using adjusted closing daily and monthly prices of 3 assests:
+#SBI, BHEL and S&P BSE500
+#Submission Date :
+
+#remove the pre existing objects and clear the R enivronment
+rm(list=ls())
+
+# #Step 1: install and load the necessary packages
+# install.packages("corrplot")
+# install.packages("PerformanceAnalytics")
+# install.packages("tseries")
+# install.packages("zoo")
+#Load the packges
+library(corrplot)
+library(PerformanceAnalytics)
+library(tseries)
+library(zoo)
+
+#Section 1.1.1 Example data
+
+#getting daily & monthly adjusted closing price data from yahoo
+#from last 15 years (2003 to 2018) for SBI, BHEL and S&P 500
+####################################### Daily data - (2003 to 2018) ##########################################
+
+#SBI daily prices data
+sbiDailyPrices <- get.hist.quote(instrument="SBIN.NS", start="2004-07-01",
+                      end="2018-06-01", quote="AdjClose",
+                      provider="yahoo", origin="1970-01-01",
+                      compression="d", retclass="zoo")
+start(sbiDailyPrices)
+sbiDailyPrices <- na.omit(sbiDailyPrices)
+nrow(sbiDailyPrices)
+
+#BHEL daily prices data
+bhelDailyPrices <- get.hist.quote(instrument="BHEL.NS", start="2004-08-25",
+                      end="2018-06-01", quote="AdjClose",
+                      provider="yahoo", origin="1970-01-01",
+                      compression="d", retclass="zoo")
+start(bhelDailyPrices)
+bhelDailyPrices <- na.omit(bhelDailyPrices)
+nrow(bhelDailyPrices)
+
+#S&P BSE 500 daily prices data
+sp500DailyPrices <- get.hist.quote(instrument="^gspc", start="2004-08-25",
+                      end="2018-06-01", quote="AdjClose",
+                      provider="yahoo", origin="1970-01-01",
+                      compression="d", retclass="zoo")
+start(sp500DailyPrices)
+sp500DailyPrices <- na.omit(sp500DailyPrices)
+nrow(sp500DailyPrices)
+
+#merge all the 3 asset prices 
+sbibhelSP500DailyPrices <- merge(sbiDailyPrices, bhelDailyPrices, sp500DailyPrices)
+#omit the NA values
+sbibhelSP500DailyPrices <- na.omit(sbibhelSP500DailyPrices)
+
+head(sbibhelSP500DailyPrices)
+
+# check if all the Rows in the merged dataset are complete and have no missing values
+if(nrow(sbibhelSP500DailyPrices) == length(complete.cases(sbibhelSP500DailyPrices))){
+  cat("No Null values in the dataset\n")
+} else {
+  cat("Caution: Null values in the dataset. May yield to biased results\n")
+}
+
+#Daily returns
+sbiDailyReturns <- Return.calculate(xts(sbiDailyPrices), method="simple")
+bhelDailyReturns <- Return.calculate(xts(bhelDailyPrices), method="simple")
+sp500DailyReturns <- Return.calculate(xts(sp500DailyPrices), method="simple")
+
+#omit NA values
+sbiDailyReturns <- na.omit(sbiDailyReturns)
+bhelDailyReturns <- na.omit(bhelDailyReturns)
+sp500DailyReturns <- na.omit(sp500DailyReturns)
+
+head(sbiDailyReturns)
+head(bhelDailyReturns)
+head(sp500DailyReturns)
+
+############################### Monthly data - (2003 to 2018) #####################################
+
+#SBI.NS monthly prices from yahoo finance
+sbiMonthlyPrices <- NULL
+sbiMonthlyPrices <- get.hist.quote(instrument="SBIN.NS", start="2004-06-01",
+                      end="2018-06-01", quote="AdjClose",
+                      provider="yahoo", origin="1970-01-01",
+                      compression="m", retclass="zoo")
+head(sbiMonthlyPrices)
+nrow(sbiMonthlyPrices)
+start(sbiMonthlyPrices)
+
+#BHEL monthly prices from yahoo finance
+bhelMonthlyPrices <- get.hist.quote(instrument="BHEL.NS", start="2004-07-01",
+                      end="2018-06-01", quote="AdjClose",
+                      provider="yahoo", origin="1970-01-01",
+                      compression="m", retclass="zoo")
+head(bhelMonthlyPrices)
+nrow(bhelMonthlyPrices)
+
+#BSE S&P 500 monthly prices from yahoo finance
+sp500MonthlyPrices <- get.hist.quote(instrument="^gspc", start="2004-07-31",
+                      end="2018-06-01", quote="AdjClose",
+                      provider="yahoo", origin="1970-01-01",
+                      compression="m", retclass="zoo")
+sp500Monthly <- get.hist.quote(instrument="^gspc", start="2004-07-31",
+                      end="2018-06-01", quote="AdjClose",
+                      provider="yahoo", origin="1970-01-01",
+                      compression="m", retclass="zoo")
+
+head(sp500MonthlyPrices)
+nrow(sp500MonthlyPrices)
+
+#remove NA values
+sbiMonthlyPrices = na.omit(sbiMonthlyPrices)
+bhelMonthlyPrices = na.omit(bhelMonthlyPrices)
+sp500MonthlyPrices = na.omit(sp500MonthlyPrices)
+
+#change the class of the date index to year month for the monthly data
+index(sbiMonthlyPrices) <- as.yearmon(index(sbiMonthlyPrices))
+index(bhelMonthlyPrices) <- as.yearmon(index(bhelMonthlyPrices))
+index(sp500MonthlyPrices) <- as.yearmon(index(sp500MonthlyPrices))
+
+#make sure the asset prices have same time periods start and end time period
+head(sbiMonthlyPrices)
+head(bhelMonthlyPrices)
+head(sp500MonthlyPrices)
+
+#Setting column names for daily & monthly prices data
+colnames(sbiDailyPrices) <- colnames(sbiMonthlyPrices) <- "SBI"
+colnames(bhelDailyPrices) <- colnames(bhelMonthlyPrices) <- "BHEL"
+colnames(sp500DailyPrices) <- colnames(sp500MonthlyPrices)  <- "S&P500"
+
+#Calculating Returns
+#Monthly returns
+sbiMonthlyReturns <- Return.calculate(xts(sbiMonthlyPrices), method="simple")
+bhelMonthlyReturns <- Return.calculate(xts(bhelMonthlyPrices), method="simple")
+sp500MonthlyReturns <- Return.calculate(xts(sp500MonthlyPrices), method="simple")
+
+colnames(sbiMonthlyReturns) <- colnames(sbiDailyReturns) <- "SBI"
+colnames(bhelMonthlyReturns) <- colnames(bhelDailyReturns) <- "BHEL"
+colnames(sp500MonthlyReturns) <- colnames(sp500DailyReturns) <- "S&P500"
+
+#Remove NA values from each object 
+sbiMonthlyReturns <- na.omit(sbiMonthlyReturns)
+bhelMonthlyPrices <- na.omit(bhelMonthlyPrices)
+sp500MonthlyReturns <- na.omit(sp500MonthlyReturns)
+
+#Mean/Expected monthly returns
+cat("Expected Return of SBI - ", round(mean(sbiMonthlyReturns, na.rm=TRUE), 4))
+cat("Expected Return of BHEL - ", round(mean(bhelMonthlyReturns, na.rm=TRUE), 4))
+cat("Expected Return of S&P500 - ", round(mean(sp500MonthlyReturns, na.rm=TRUE),4))
+#Observation:
+
+#Standard deviations(monthly)
+cat("Risk associated with SBI - ", round(StdDev(sbiMonthlyReturns), 4))
+cat("Risk associated with BHEL - ", round(StdDev(bhelMonthlyReturns), 4))
+cat("Risk associated with S&P500 - ", round(StdDev(sp500MonthlyReturns), 4))
+#Observation:
+# From August to early September 2004, SBI prices increased from 32.15 to 33.58, while BHEL prices fluctuated slightly, ending at 29.37. The S&P 500 remained stable around 1105. Daily returns show SBI's notable 0.0421 return on 2004-08-26, with BHEL and S&P 500 having minor fluctuations. Expected returns are 0.0184 for SBI, 0.0118 for BHEL, and 0.0062 for S&P 500, with respective risks of 0.1117, 0.1151, and 0.0391. The dataset spans from 2004-05-31 to 2018-05-31, with no missing values, ensuring robust analysis.
+
+```
+
+```{r}
+#1.1.2 Time Plots
+#create merged zoo objects containing all 3 assets monthly data
+sbibhelSP500MonthlyPrices = merge(sbiMonthlyPrices, bhelMonthlyPrices, sp500MonthlyPrices)
+sbibhelSP500MonthlyPrices = na.omit(sbibhelSP500MonthlyPrices)
+head(sbibhelSP500MonthlyPrices)
+
+par(mfrow=c(2,1))
+
+#3 panel plot showing monthly prices
+plot.zoo(sbibhelSP500MonthlyPrices, main="", lwd=2, col="blue")
+par(mfrow=c(1,1))
+
+#Observation:
+# The graph displays the adjusted daily prices of SBI, BHEL, and the S&P 500 from 2005 to 2018.
+# SBI prices show significant growth with peaks around 2008 and 2010, followed by fluctuating trends and a decline post-2015.
+# BHEL prices experienced a steep rise until 2008, a notable peak around 2010, and a steady decline thereafter.
+# The S&P 500 demonstrates a consistent upward trend, especially post-2009, indicating recovery and growth after the financial crisis.
+# Overall, while SBI and BHEL exhibit more volatility and peaks, the S&P 500 shows steady and sustained growth.
+
+```
+
+```{r}
+#time plot for returns
+my.panel <- function(...) {
+ lines(...)
+ abline(h=0)
+}
+
+#merge all 3 monthly returns
+sbibhelSP500MonthlyReturns <- merge(sbiMonthlyReturns, bhelMonthlyReturns, sp500MonthlyReturns)
+#remove NA values
+sbibhelSP500MonthlyReturns <- na.omit(sbibhelSP500MonthlyReturns)
+colnames(sbibhelSP500MonthlyReturns) <- c("SBI", "BHEL", "S&P500")
+
+#Plotting monthly returns of the 3 assets
+plot.zoo(sbibhelSP500MonthlyReturns, main="", panel = my.panel, lwd=2, col="blue")
+
+#Observation:
+# The graph shows the daily returns of SBI, BHEL, and the S&P 500 from 2005 to 2018.
+# SBI returns exhibit high volatility, particularly around 2008-2009 and 2017-2018.
+# BHEL returns also show significant volatility, with notable spikes around 2008-2010 and a general decrease in volatility post-2014.
+# The S&P 500 returns display lower volatility compared to SBI and BHEL, with more consistent and smaller fluctuations.
+# Overall, SBI and BHEL exhibit higher volatility in returns, especially during the financial crisis period, while S&P 500 returns are relatively stable.
+
+```
+
+```{r}
+#Plotting all 3 returns on the same graph with color variance
+plot.zoo(sbibhelSP500MonthlyReturns, plot.type="single", main="",
+    col = c("brown", "deepskyblue4", "black"), lty=c("dashed", "dotted", "solid"),
+    lwd=2, ylab="Returns") 
+abline(h=0) 
+ legend(x="bottomright", legend=colnames(sbibhelSP500MonthlyReturns),
+       lty=c("dashed", "dotted", "solid"), lwd=2,
+       col=c("brown","deepskyblue4", "black"))
+#Observation:
+# the performance of three indices (SBI, BHEL, and S&P500) over the period from 2005 to 2017.
+# The S&P500 index, appears to be more stable and displays a consistent upward trend, indicating steady growth during this period.
+# In contrast, the SBI and BHEL indices, exhibit higher volatility with frequent ups and downs.
+# The SBI index seems to have experienced a significant decline around the 2008-2009 period, likely due to the global financial crisis.
+# Both the SBI and BHEL indices appear to have underperformed compared to the S&P500 index during the time frame shown.
+```
+
+```{r}
+#Continuous compounded returns
+sbiCCReturns <- log(1+sbiMonthlyReturns)
+bhelCCReturns <- log(1+bhelMonthlyReturns)
+sp500CCReturns <- log(1+sp500MonthlyReturns)
+
+sbiCCReturns <- na.omit(sbiCCReturns)
+bhelCCReturns <- na.omit(bhelCCReturns)
+sp500CCReturns <- na.omit(sp500CCReturns)
+
+#set the column names
+colnames(sbiCCReturns) <- "sbi"
+colnames(bhelCCReturns) <- "bhel"
+colnames(sp500CCReturns) <- "S&P500"
+
+#Comparing simple and continuously compounded returns
+sbiRetDiff <- sbiMonthlyReturns - sbiCCReturns
+head(sbiCCReturns)
+head(sbiMonthlyReturns)
+
+#colnames(sbiRetDiff) = "Difference"
+sbi_dataToPlot = NULL
+sbi_dataToPlot <- merge(sbiMonthlyReturns,  sbiCCReturns, sbiRetDiff)
+head(sbi_dataToPlot)
+colnames(sbi_dataToPlot) <- c("Monthly", "Cumulative", "Difference") 
+
+#Simple and continuously compounded returns for sbi
+plot.zoo(sbi_dataToPlot, plot.type="multiple", main="",
+      lwd=2, col=c("brown", "skyblue", "black"), panel=my.panel)
+legend(x="bottomright", legend=colnames(sbi_dataToPlot),
+       lwd=2, col=c("brown","skyblue", "black"))
+#Observation:
+# The graph depicts the monthly cumulative difference of three indices over time, from 2005 to 2018.
+# The top (red) line shows higher volatility with frequent peaks and troughs, indicating a more volatile index.
+# The middle (blue) line exhibits a relatively smoother pattern with smaller fluctuations, suggesting a more stable index.
+# The bottom (black) line also displays volatility, but with fewer extreme peaks compared to the top line.
+# There appears to be a significant drop across all three indices around the 2008-2009 period, potentially related to the global financial crisis.
+# Overall, the graph highlights the varying levels of volatility and stability among the three indices over the given time frame.
+```
+
+```{r}
+#checking if all the daily returns are starting at the same date
+start(sbiDailyReturns)
+start(bhelDailyReturns)
+start(sp500DailyReturns)
+
+#calculating and merging all the daily returns of the 3 assets
+sbibhelSP500DailyReturns <- Return.calculate(sbibhelSP500DailyPrices, method="simple")
+sbibhelSP500DailyReturns <- na.omit(sbibhelSP500DailyReturns)
+
+#assigning column names
+colnames(sbibhelSP500DailyReturns) <- c("sbi", "Infosys", "S&P500")
+
+#plotting daily returns
+plot.zoo(sbibhelSP500DailyReturns, main="",
+ panel=my.panel, col=c("red", "blue", "black"), xlab = "Daily Returns")
+#Observation:
+# The graph displays the daily returns of three different indices or assets over a period of time.
+# The top panel (red) shows a series with frequent and pronounced spikes in both positive and negative directions, indicating high volatility.
+# The middle panel (blue) exhibits a similar pattern but with smaller fluctuations, suggesting lower volatility compared to the top series.
+# The bottom panel (black) appears to have the lowest volatility, with fewer and less extreme spikes in either direction.
+# There seems to be a period of increased volatility across all three series around the 2008-2010 timeframe, likely related to the global financial crisis.
+# The volatility patterns observed could be useful for analyzing risk and potential investment strategies for these assets or indices.
+```
+
+```{r}
+#Equity curves, shows how our investment amount in each asset grows over time.
+bhelMonthlyReturns = na.omit(bhelMonthlyReturns)
+sbi_eqtyCurve <- cumprod(1+sbiMonthlyReturns)
+bhel_eqtyCurve <- cumprod(1+bhelMonthlyReturns)
+sp500_eqtyCurve <- cumprod(1+sp500MonthlyReturns)
+
+sbi_eqtyCurve <- na.omit(sbi_eqtyCurve)
+bhel_eqtyCurve <- na.omit(bhel_eqtyCurve)
+sp500_eqtyCurve <- na.omit(sp500_eqtyCurve)
+
+#merge all 3 compounded returns to produce equity curves
+dataToPlot <- merge(sbi_eqtyCurve, bhel_eqtyCurve, sp500_eqtyCurve)
+dataToPlot <- na.omit(dataToPlot)
+head(dataToPlot)
+colnames(dataToPlot) <- c("sbi", "Infosys", "SP500")
+```
+
+```{r}
+plot.zoo(dataToPlot, plot.type="single", main ="", 
+        col=c("red", "blue", "black"), ylab="Cumulative Returns", lwd=2) 
+legend(x="topleft", legend=colnames(dataToPlot),
+    col=c("red", "blue", "black"), lwd=2)
+#Observation:
+# The graph displays the cumulative returns of three indices: sbi (red), Infosys (blue), and S&P500 (purple) over the period from 2005 to 2017.
+# The Infosys index exhibits the highest volatility, with pronounced peaks and troughs throughout the time period.
+# The S&P500 index shows a generally upward trend with relatively lower volatility compared to the other two indices.
+# All three indices experienced a significant drop around the 2008-2009 period, likely due to the global financial crisis.
+# The sbi index appears to have the lowest volatility among the three, with a more gradual and steady growth pattern.
+# Overall, the graph highlights the varying performance and volatility characteristics of the three indices over the given time frame.
+```
+
+```{r}
+#Expected Daily Returns 
+cat("sbi Expected Daily return - ", round(mean(sbiDailyReturns), 4))
+cat("\nInfosys Expected Daily return - ",round(mean(bhelDailyReturns),4))
+cat("\nS&P500 Expected Daily return - ",round(mean(sp500DailyReturns),5))
+
+#Daily Standard Deviations
+cat("\nRisk of Daily Returns from sbi - ",round(StdDev(sbiDailyReturns), 4))
+cat("\nRisk of Daily Returns from Infosys - ",round(StdDev(bhelDailyReturns), 4))
+cat("\nRisk of Daily Returns from S&P500 - ",round(StdDev(sp500DailyReturns), 4))
+
+#Histograms for daily and monthly returns
+par(mfrow=c(3,3))
+par(mar = rep(2, 4))
+ hist(sbiMonthlyReturns, main="", col="cornflowerblue")
+ hist(bhelMonthlyReturns, main="", col="cornflowerblue")
+ hist(sp500MonthlyReturns, main="", col="cornflowerblue")
+ hist(sbiDailyReturns, main="", col="cornflowerblue")
+ hist(bhelDailyReturns, main="", col="cornflowerblue")
+ hist(sp500DailyReturns, main="",col="cornflowerblue")
+par(mfrow=c(1,1))
+
+#Observation:
+ # The histograms show the distribution of daily and monthly returns for sbi, Infosys, and S&P500 indices.
+# The sbi and Infosys indices exhibit higher daily return volatility compared to the S&P500 index, as evidenced by their wider histograms.
+# The S&P500 index has a lower expected daily return but also lower risk (standard deviation) compared to sbi and Infosys.
+# The monthly return distributions for all three indices appear to be more concentrated around the mean, suggesting lower volatility over longer time periods.
+# The sbi index seems to have a slightly higher expected daily return compared to Infosys, but it also carries higher risk (standard deviation).
+# Overall, the histograms provide insights into the risk-return characteristics of these indices, aiding investment decision-making and portfolio management.
+```
+
+```{r}
+sbiHist = hist(sbiMonthlyReturns, plot=FALSE, breaks=15)
+par(mfrow=c(3,3))
+  hist(sbiMonthlyReturns, main="", col="cornflowerblue")
+  hist(bhelMonthlyReturns, main="", col="cornflowerblue") #breaks=bhelHist$breaks)
+  hist(sp500MonthlyReturns, main="", col="cornflowerblue") #breaks=sp500Hist$breaks)
+  hist(sbiDailyReturns, main="", col="cornflowerblue")
+  hist(bhelDailyReturns, main="", col="cornflowerblue")#, breaks=sbiHist$breaks)
+  hist(sp500DailyReturns, main="", col="cornflowerblue") #, breaks=sbiHist$breaks)
+par(mfrow=c(1,1))
+```
+
+```{r}
+#Checking for normal distribution of data
+set.seed(123)
+sbi_gwnDaily = rnorm(length(sbiDailyReturns), mean=mean(sbiDailyReturns), sd=sd(sbiDailyReturns))
+sbi_gwnDaily = zoo(sbi_gwnDaily, index(sbiDailyReturns))
+sbi_gwnMonthly = rnorm(length(sbiMonthlyReturns), mean=mean(sbiMonthlyReturns), sd=sd(sbiMonthlyReturns))
+sbi_gwnMonthly = zoo(sbi_gwnMonthly, index(sbiMonthlyReturns))
+
+bhel_gwnDaily = rnorm(length(bhelDailyReturns), mean=mean(bhelDailyReturns), sd=sd(bhelDailyReturns))
+bhel_gwnDaily = zoo(bhel_gwnDaily, index(bhelDailyReturns))
+bhel_gwnMonthly = rnorm(length(bhelMonthlyReturns), mean=mean(bhelMonthlyReturns), sd=sd(bhelMonthlyReturns))
+bhel_gwnMonthly = zoo(bhel_gwnMonthly, index(bhelMonthlyReturns))
+
+sp500_gwnDaily = rnorm(length(sp500DailyReturns), mean=mean(sp500DailyReturns), sd=sd(sp500DailyReturns))
+sp500_gwnDaily = zoo(sp500_gwnDaily, index(sp500DailyReturns))
+sp500_gwnMonthly = rnorm(length(sp500MonthlyReturns), mean=mean(sp500MonthlyReturns), sd=sd(sp500MonthlyReturns))
+sp500_gwnMonthly = zoo(sp500_gwnMonthly, index(sp500MonthlyReturns))
+
+sbi_gwnMonthly <- na.omit(sbi_gwnMonthly)
+bhel_gwnMonthly <- na.omit(bhel_gwnMonthly)
+sp500_gwnMonthly <- na.omit(sp500_gwnMonthly)
+sbi_gwnDaily <- na.omit(sbi_gwnDaily)
+bhel_gwnDaily <- na.omit(bhel_gwnDaily)
+sp500_gwnDaily <- na.omit(sp500_gwnDaily)
+
+gwnMonthly <- merge(sbi_gwnMonthly, bhel_gwnMonthly, sp500_gwnMonthly)
+gwnDaily <- merge(sbi_gwnDaily, bhel_gwnDaily, sp500_gwnDaily)
+```
+
+```{r}
+par(mfrow=c(2,2))
+ plot.zoo(sbiMonthlyReturns, main="Monthly Returns on sbi",
+ lwd=2, col="blue", ylim=c(-0.4, 0.4))
+ abline(h=0)
+ plot.zoo(sbi_gwnMonthly, main="Simulated Normal Returns",
+ lwd=2, col="blue", ylim=c(-0.4, 0.4))
+ abline(h=0)
+ hist(sbiMonthlyReturns, main="", col="cornflowerblue",
+ xlab="returns")
+ hist(sbi_gwnMonthly, main="", col="cornflowerblue",
+ xlab="returns")
+par(mfrow=c(1,1))
+#Observation:
+# As per the distribution obtained Monthly Returns on SBI shows a normal distribution skewd to the right
+# Simulated Normal Returns follows a normal distribution
+```
+
+```{r}
+#Historgram with smoothed curve
+sbiMonthlyReturns <- na.omit(sbiMonthlyReturns)
+bhelMonthlyReturns <- na.omit(bhelMonthlyReturns)
+sp500MonthlyReturns <- na.omit(sp500MonthlyReturns)
+#sbi.density = density(sbiMonthlyReturns)
+par(mfrow=c(1, 3))
+ hist(sbiMonthlyReturns, main="", xlab="sbi Monthly Returns",
+ col="cornflowerblue", probability=T, ylim=c(0,5))
+ points(density(sbiMonthlyReturns),type="l", col="orange", lwd=2)
+#bhel.density = density(bhelMonthlyReturns)
+hist(bhelMonthlyReturns, main="", xlab="Infosis Monthly Returns",
+     col="cornflowerblue", probability=T, ylim=c(0,5))
+ points(density(bhelMonthlyReturns),type="l", col="orange", lwd=2)
+hist(sp500MonthlyReturns, main="", xlab="SP500 Monthly Returns",
+     col="cornflowerblue", probability=T, ylim=c(0,5))
+ points(density(sp500MonthlyReturns),type="l", col="orange", lwd=2)
+par(mfrow=c(1,1))
+#Since histograms are discontinuous, we are plotting density curves to show continuous graph.
+```
+
+```{r}
+#quantiles of returns
+#sbi Quantiles
+quantile(sbiMonthlyReturns)
+quantile(sbiMonthlyReturns, probs=c(0.01, 0.05))
+#Observation:
+
+#Infosys Quantiles
+quantile(bhelMonthlyReturns)
+quantile(bhelMonthlyReturns, probs = c(0.01, 0.05))
+
+#S&P500 Quantiles
+quantile(sp500MonthlyReturns)
+quantile(sp500MonthlyReturns, probs = c(0.01, 0.05))
+
+#Median Values of the 3 assets:
+apply(sbibhelSP500MonthlyReturns, 2, median)
+#IQR Values of the 3 assets:
+apply(sbibhelSP500MonthlyReturns, 2, IQR)
+```
+
+```{r}
+#using quantiles to compute Value_at_Risk
+W = 100000
+sbiQuantiles = quantile(sbiMonthlyReturns, probs=c(0.01, 0.05))
+bhelQuantiles = quantile(bhelMonthlyReturns, probs=c(0.01, 0.05))
+sp500Quantiles = quantile(sp500MonthlyReturns, probs=c(0.01, 0.05))
+sbiVaR = W*sbiQuantiles
+bhelVaR = W*bhelQuantiles
+sp500VaR = W*sp500Quantiles
+print("Value-at-Risk of sbi, Infosys, S&P500")
+sbiVaR
+bhelVaR
+sp500VaR
+#Interpretation of VaR for the 3 assets:
+
+```
+
+```{r}
+par(mfrow=c(3,3))
+ qqnorm(sbiMonthlyReturns, main="sbi Monthly Returns", col="cornflowerblue")
+ qqline(sbiMonthlyReturns)
+ qqnorm(bhelMonthlyReturns, main="bhel Monthly Returns", col="cornflowerblue")
+ qqline(bhelMonthlyReturns)
+ qqnorm(sp500MonthlyReturns, main="S&P500 Monthly Returns", col="cornflowerblue")
+ qqline(sp500MonthlyReturns)
+ qqnorm(sbiDailyReturns, main="sbi Daily Returns", col="cornflowerblue")
+ qqline(sbiDailyReturns)
+ qqnorm(bhelDailyReturns, main="bhel Daily Returns", col="cornflowerblue")
+ qqline(bhelDailyReturns)
+ qqnorm(sp500DailyReturns, main="SP500 Daily Returns", col="cornflowerblue")
+ qqline(sp500DailyReturns)
+ qqnorm(sbi_gwnMonthly, main="sbi GWN Monthly", col="cornflowerblue")
+ qqline(sbi_gwnMonthly)
+ qqnorm(sbi_gwnDaily, main="sbi GWN Daily", col="cornflowerblue")
+ qqline(sbi_gwnDaily)
+par(mfrow=c(1,1))
+#Observation: 
+# The Q-Q plots depict the distribution of monthly and daily returns for SBI, BHEL, and S&P 500.
+# Each plot compares the sample quantiles of the returns to the theoretical quantiles of a normal distribution.
+# The blue line represents the theoretical quantiles, and the circles represent the sample quantiles.
+# Deviations from the blue line indicate departures from normality in the return distributions.
+# The "sbi GWN" plots display the returns for a generated white noise process, serving as a reference for comparison.
+# Overall, most plots show slight deviations from normality, particularly in the tails, suggesting potential non-normality in returns.
+
+```
+
+```{r}
+#QQ plots for returns
+# coredata strips index/time attributes and returns only the observations 
+library(car)
+
+par(mfrow=c(1, 3))
+qqPlot(coredata(sbiMonthlyReturns), distribution="t", df=5,
+ylab="sbi quantiles", envelope=FALSE)
+qqPlot(coredata(bhelMonthlyReturns), distribution="t", df=5,
+ylab="Infosys quantiles", envelope=FALSE)
+
+par(mfrow=c(1,1))
+#The qq plots for the returns w.r.t the t-distribution explain the data better than the normal distribution. Less outliers and more linearity in data.
+```
+
+```{r}
+#Sample shape statistics for the returns
+#Monthly Statistics:
+#apply(X, MARGIN, FUN)x: an array or matrix-MARGIN:  take a value or range between 1 and 2 to define where to apply the function:-MARGIN=1`: the manipulation is performed on rows-MARGIN=2`: the manipulation is performed on columns-MARGIN=c(1,2)` the manipulation is performed on rows and columns-FUN: tells which function to apply. Built functions like mean, median, sum, min, max and even user-defined functions can be applied>
+
+statsMat = rbind(apply(sbibhelSP500MonthlyReturns, 2, mean),
+            apply(sbibhelSP500MonthlyReturns, 2, var),
+            apply(sbibhelSP500MonthlyReturns, 2, sd),
+            apply(sbibhelSP500MonthlyReturns, 2, skewness),
+            apply(sbibhelSP500MonthlyReturns, 2, kurtosis))
+rownames(statsMat) = c("Mean", "Variance", "Std Dev",
+                      "Skewness", "Excess Kurtosis")
+round(statsMat, digits=4)
+
+#Daily Statistics
+statsMatDaily =
+  rbind(apply(sbibhelSP500DailyReturns, 2, mean),
+            apply(sbibhelSP500DailyReturns, 2, var),
+apply(sbibhelSP500DailyReturns, 2, sd),
+            apply(sbibhelSP500DailyReturns, 2, skewness),
+            apply(sbibhelSP500DailyReturns, 2, kurtosis))
+rownames(statsMatDaily) = c("Mean", "Variance", "Std Dev",
+                      "Skewness", "Excess Kurtosis")
+round(statsMatDaily, digits=4)
+#Observation:
+
+#Applying the square-root-of-time rule to the sample mean and the SD of the returns
+#12*sample mean
+12*statsMatDaily["Mean", ]
+#sqrt(12)*S.D
+sqrt(12)*statsMatDaily["Std Dev",]
+#Interpretation:
+
+```
+
+```{r}
+gwnMonthly <- na.omit(gwnMonthly)
+head(gwnMonthly)
+
+statsMatGWN = rbind(apply(gwnMonthly, 2, mean),
+            apply(gwnMonthly, 2, var),
+            apply(gwnMonthly, 2, sd),
+            apply(gwnMonthly, 2, skewness),
+            apply(gwnMonthly, 2, kurtosis))
+rownames(statsMatGWN) = rownames(statsMat)
+
+gwnMonthlyOutlier = gwnMonthly
+gwnMonthlyOutlier[20] = -sd(gwnMonthly)*6
+gwnMonthlyOutlier <- round(gwnMonthlyOutlier, digits=4)
+
+statsMatGWNOutlier = rbind(apply(gwnMonthlyOutlier, 2, mean),
+            apply(gwnMonthlyOutlier, 2, var),
+            apply(gwnMonthlyOutlier, 2, sd),
+            apply(gwnMonthlyOutlier, 2, skewness),
+            apply(gwnMonthlyOutlier, 2, kurtosis))
+rownames(statsMatGWNOutlier) = rownames(statsMat)
+
+#GWn Data without outlier
+round(statsMatGWN, 4)
+
+#GWN data with outlier
+round(statsMatGWNOutlier, 4)
+
+sbi_gwnMonthlyOutlier <- sbi_gwnMonthly
+bhel_gwnMonthlyOutlier <- bhel_gwnMonthly
+sp500_gwnMonthlyOutlier <- sp500_gwnMonthly
+sbi_gwnMonthlyOutlier[20] <- -sd(sbi_gwnMonthly)*6
+bhel_gwnMonthlyOutlier[20] <- -sd(bhel_gwnMonthly)*6
+sp500_gwnMonthlyOutlier[20] <- -sd(sp500_gwnMonthly)*6
+
+sbi_gwnMonthlyOutlier <- round(sbi_gwnMonthlyOutlier, 4)
+bhel_gwnMonthlyOutlier <- round(bhel_gwnMonthlyOutlier, 4)
+sp500_gwnMonthlyOutlier <- round(sp500_gwnMonthlyOutlier, 4)
+colnames(gwnMonthlyOutlier) <- c("sbi", "Infosys", "S&P500")
+plot.zoo(gwnMonthlyOutlier, main="",
+ lwd=2, col="blue", ylim=c(-0.4, 0.4), ylab="", panel=my.panel) 
+```
+
+```{r}
+par(mfrow=c(3,1))
+hist.default(sbi_gwnMonthlyOutlier, main="", col="cornflowerblue",
+ xlab="sbi_GWN with outlier")
+hist.default(bhel_gwnMonthlyOutlier, main="", col="cornflowerblue",
+ xlab="bhel_GWN with outlier")
+hist.default(sp500_gwnMonthlyOutlier, main="", col="cornflowerblue",
+ xlab="SP500_GWN with outlier")
+par(mfrow=c(1,1))
+#Observation:
+# The histograms display the frequency distributions of returns for SBI, BHEL, and S&P 500 with an added outlier.
+# Each plot shows the distribution of generated white noise (GWN) returns, providing a visual representation of the data spread.
+# The presence of outliers in each histogram is indicated by the bars at the extreme left or right of the distribution.
+# These outliers significantly deviate from the central cluster of data, impacting the overall shape of the distribution.
+# The histograms are relatively symmetric, centered around zero, typical of GWN distributions.
+# Despite the outliers, the main body of the distributions suggests a normal-like pattern, highlighting the effect of extreme values on data interpretation.
+
+```
+
+```{r}
+#Boxplots
+boxplot.default(coredata(sbiMonthlyReturns), coredata(sbiCCReturns),
+        coredata(bhelMonthlyReturns), coredata(bhelCCReturns),
+        coredata(sp500MonthlyReturns), coredata(sp500CCReturns),
+        names=c("sbi Monthly", "sbi CC","bhel Monthly", "bhel CC", "BSE Monthly", "BSE CC"),
+        col="cornflowerblue")
+#Observation: 
+# The boxplot displays the distribution of monthly returns for SBI, BHEL, and BSE, along with their respective continuously compounded (CC) returns.
+# Each boxplot includes the median (central line), interquartile range (box), and potential outliers (points outside the whiskers).
+# The returns for all three assets show a relatively symmetric distribution with a few notable outliers.
+# The median of SBI and BHEL returns are higher compared to BSE returns, indicating potentially better performance.
+# The spread of returns (interquartile range) is larger for SBI and BHEL compared to BSE, suggesting higher volatility.
+# The presence of outliers in all series indicates occasional extreme returns that could impact overall performance analysis.
+
+```
+
+```{r}
+#Time series descriptive statistics
+#Sample auto correlations with specified number of lags
+acf(coredata(sbiDailyReturns), lag.max=5, plot=FALSE)
+acf(coredata(sbiMonthlyReturns), lag.max=5, plot=FALSE)
+acf(coredata(bhelDailyReturns), lag.max=5, plot=FALSE)
+acf(coredata(bhelMonthlyReturns), lag.max=5, plot=FALSE)
+acf(coredata(sp500DailyReturns), lag.max=5, plot=FALSE)
+acf(coredata(sp500MonthlyReturns), lag.max=5, plot=FALSE)
+
+#Observation:
+# The autocorrelation values for sbiDailyReturns show a small positive correlation at lag 1 (0.080) and generally low correlations at other lags.
+# For sbiMonthlyReturns, there is a small positive correlation at lag 1 (0.058), with fluctuations around zero for other lags.
+# The bhelDailyReturns exhibit a negligible autocorrelation at lag 1 (0.015), indicating minimal linear dependence over time.
+# bhelMonthlyReturns show a slight negative correlation at lag 1 (-0.014) and small positive correlations at lags 2 (0.046) and 3 (0.081).
+# The sp500DailyReturns have a small negative autocorrelation at lag 1 (-0.101), suggesting a slight tendency for mean reversion.
+# For sp500MonthlyReturns, there is a moderate positive autocorrelation at lag 1 (0.140) and 4 (0.177), indicating some persistence in monthly returns.
+  
+```
+
+```{r}
+#Plot the correlations
+par(mfrow=c(2,3))
+ acf(coredata(sbiMonthlyReturns), main="sbi Monthly Returns", lwd=2)
+ acf(coredata(bhelMonthlyReturns), main="Infosys Monthly Returns", lwd=2)
+ acf(coredata(sp500MonthlyReturns), main="S&P500 Monthly Returns", lwd=2)
+ acf(coredata(sbiDailyReturns), main="sbi Daily Returns", lwd=2)
+ acf(coredata(bhelMonthlyReturns), main="Infosys Daily Returns", lwd=2)
+ acf(coredata(sp500DailyReturns), main="sp500 Daily ReurntS", lwd=2)
+par(mfrow=c(1,1))
+#observation:
+# The ACF plots display the autocorrelation functions for monthly and daily returns of SBI, Infosys, and S&P 500.
+# Each bar represents the autocorrelation at a specific lag, with the dashed blue lines indicating the 95% confidence interval.
+# For sbi Monthly Returns, most autocorrelations are within the confidence interval, indicating weak or no significant autocorrelation.
+# Infosys Monthly Returns show a similar pattern, with most autocorrelations within the confidence interval, suggesting weak dependence over time.
+# The S&P 500 Monthly Returns exhibit some significant autocorrelations, particularly at lower lags, indicating some persistence in the returns.
+# For daily returns, both SBI and Infosys show minimal autocorrelation with most values close to zero, indicating weak dependence.
+# The S&P 500 Daily Returns also exhibit minimal autocorrelation, with values largely within the confidence interval, suggesting minimal serial correlation.
+
+```
+
+```{r}
+#scatter plots
+sbiM = zoo(sbiMonthlyReturns, index(sbiMonthlyReturns))
+bhelM = zoo(bhelMonthlyReturns, index(bhelMonthlyReturns))
+sp500M = zoo(sp500MonthlyReturns, index(sp500MonthlyReturns))
+sbiD = zoo(sbiDailyReturns, index(sbiDailyReturns))
+bhelD = zoo(bhelDailyReturns, index(bhelDailyReturns))
+sp500D = zoo(sp500DailyReturns, index(sp500DailyReturns))
+
+par(mfrow=c(2,3))
+plot.zoo(sbiM,bhelM,main="", xlab="S&P500 Monthly Returns", ylab="sbi Monthly Returns", 
+         col="blue", cex=0.8)
+plot.zoo(sp500M,sbiM,main="",
+   xlab="S&P500 Monthly Returns", ylab="sbi Monthly Returns", col="blue", cex=0.8)
+plot(sp500M,bhelM,main="",
+  xlab="S&P500 Monthly Returns", ylab="Infosys Monthly Returns", col="blue", cex=0.8)
+plot(sbiD,bhelD,main="",
+  xlab="sbi Daily Returns", ylab="Info Daily Returns", col="blue", cex=0.8)
+plot(sp500D,sbiD,main="",
+ xlab="S&P500 Daily Returns", ylab="sbi Daily Returns", col="blue", cex=0.8)
+plot(sp500D,bhelD,main="",
+ xlab="S&P500 Daily Returns", ylab="Infosys Daily Returns", col="blue", cex=0.8)
+par(mfrow=c(1,1))
+#Observations:
+ # The scatter plots depict the relationship between the returns of SBI, Infosys, and S&P 500 on both monthly and daily time frames.
+# The top row shows the correlation between S&P 500 Monthly Returns and the monthly returns of SBI and Infosys.
+# The bottom row displays the relationship between S&P 500 Daily Returns and the daily returns of SBI and Infosys.
+# The first plot (top left) suggests a positive correlation between SBI and S&P 500 Monthly Returns.
+# The second plot (top center) shows a less clear but still positive relationship between Infosys Monthly Returns and S&P 500 Monthly Returns.
+# The third plot (top right) indicates a positive but weaker correlation between Infosys and S&P 500 Monthly Returns.
+# The bottom row shows a tighter clustering around the origin, indicating a weaker correlation for daily returns compared to monthly returns.
+# Overall, these plots suggest that the monthly returns of SBI and Infosys have a noticeable relationship with the S&P 500, whereas the daily returns exhibit weaker correlations.
+
+```
+
+```{r}
+sbi_gwnM = zoo(sbi_gwnMonthly, index(sbi_gwnMonthly))
+pairs(cbind(sbiM, bhelM, sp500M), col="blue",pch=16, cex=1.25, cex.axis=1.25)
+#Observation
+# The scatterplot matrix displays pairwise relationships between the returns of SBI, BHEL, and S&P 500.
+# Each subplot shows the scatterplot for the pair of returns indicated by the row and column labels.
+# The diagonal plots are labeled with the names of the return series (SBI, BHEL, S&P 500).
+# The scatterplots on the off-diagonal elements reveal the relationships between each pair of return series.
+# The SBI vs. BHEL plot (first row, first column) and BHEL vs. SBI plot (second row, second column) indicate a positive correlation.
+# The SBI vs. S&P 500 plot (first row, last column) and S&P 500 vs. SBI plot (last row, first column) show a less clear but noticeable positive correlation.
+# The BHEL vs. S&P 500 plot (second row, last column) and S&P 500 vs. BHEL plot (last row, second column) suggest a positive relationship, but with more scatter.
+
+```
+
+```{r}
+#Sample covariance and correlation
+#Covariance of Monthly returns
+cov(sbibhelSP500MonthlyReturns)
+#Covariance of daily returns
+cov(sbibhelSP500DailyReturns)
+
+
+#Correlation of Monthly returns
+cor(sbibhelSP500MonthlyReturns)
+#Correlation of Daily returns
+cor(sbibhelSP500DailyReturns)
+
+
+#using cov2cor function to show covariance and correlation matrices
+cov2cor(cov(sbibhelSP500MonthlyReturns))
+cov2cor(cor(sbibhelSP500DailyReturns))
+
+#Visualizing Correlation Matrix
+Cor_Mat=cor(sbibhelSP500MonthlyReturns)
+corrplot.mixed(Cor_Mat, lower="number", upper="ellipse")
+#Observation:
+# The correlation matrix plot visualizes the pairwise correlations between the returns of SBI, BHEL, and S&P 500.
+# The upper triangle of the matrix shows ellipses representing the strength and direction of the correlations.
+# The ellipses' shape and color indicate the correlation value, with narrower and darker ellipses indicating stronger correlations.
+# The numbers in the lower triangle represent the correlation coefficients, providing a numeric summary of the relationships.
+# A strong positive correlation (0.61) is observed between SBI and BHEL returns, indicating they move together.
+# The correlations between SBI and S&P 500, and BHEL and S&P 500, are weaker (0.09 and -0.03, respectively), suggesting minimal linear relationships.
+# The color scale on the right shows the correlation range from -1 (strong negative) to 1 (strong positive).
+
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
